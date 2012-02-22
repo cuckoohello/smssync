@@ -36,7 +36,8 @@ SOURCES += main.cpp \
     util.c \
     drv_imap.c \
     config.c \
-    sync.c
+    sync.c \
+    syncmessagemodel.cpp
 
 # Please do not modify the following two lines. Required for deployment.
 include(qmlapplicationviewer/qmlapplicationviewer.pri)
@@ -53,4 +54,5 @@ OTHER_FILES += \
 
 HEADERS += \
     base64.h \
-    isync.h
+    isync.h \
+    syncmessagemodel.h
