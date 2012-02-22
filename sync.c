@@ -261,6 +261,9 @@ int sms_imap_prepare()
 
     arc4_init();
 
+    if(!stores || !stores->driver)
+        return 1;
+
     mconf = stores;
     mdriver = mconf->driver;
     if (!(mctx = mdriver->open_store( mconf, mctx ))) {

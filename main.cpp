@@ -45,7 +45,11 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
     QScopedPointer<QApplication> app(createApplication(argc, argv));
 
     char message[8192]; // This should be large enough for messages
-    sms_imap_prepare();
+    if(sms_imap_prepare())
+    {
+        qDebug() << "Config error or network error!";
+        return 1;
+    }
     QString myEmail = QString().fromAscii(accountEmail);
     QString myName = myEmail.split("@").at(0);
     QString timeZone = getTimeZone();
@@ -68,13 +72,14 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
 
     syncModel.setQueryMode(EventModel::SyncQuery);
     syncModel.getEvents();
-    qDebug() << "Total " << (isFirst ? syncModel.rowCount() :  syncModel.rowCount() -1 )<<" messages need to sync!";
+    int total = isFirst ? syncModel.rowCount() :  syncModel.rowCount() -1;
+    qDebug() << "Total " << total <<" messages need to sync!";
 
     /* no new messages ,so just return 0 */
     if(isFirst && syncModel.rowCount() == 0)
-        return 0;
+        goto sync_done;
     else if (!isFirst && syncModel.rowCount() == 1)
-        return 0;
+        goto sync_done;
 
     for (int i= isFirst ? 0 :1 ;i < syncModel.rowCount();i++)
     {
@@ -133,18 +138,42 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
 
         imap_add_contect(message,syncModel.data(syncModel.index(i,13),0).toString().toUtf8().data());
 
-        sms_imap_sync_one(message);
+        if(sms_imap_sync_one(message))
+        {
+            /* sync error */
+            qDebug() << "Sync network error!";
+            char *date = syncModel.data(syncModel.index(i-1,3),0).toDateTime()
+            .toLocalTime().toString("ddd, d MMM yyyy H:m:s").toUtf8().data();
+            memcpy(sync_date,date,strlen(date));
+            sync_date[strlen(date)] = 0;
+            save_state_config(0,0);
+            goto sync_done;
+        }
         if(syncModel.rowCount()-i <= 10 || i%10 == 0)
-            qDebug() << i << "/" <<syncModel.rowCount() <<" synced!";
+            qDebug() << (isFirst ? i : i-1) << "/" <<total <<" synced!";
+
+        if(i%10 == 0)
+        {
+            /* backup status every 10 backups */
+            char *date = syncModel.data(syncModel.index(i,3),0).toDateTime()
+            .toLocalTime().toString("ddd, d MMM yyyy H:m:s").toUtf8().data();
+            memcpy(sync_date,date,strlen(date));
+            sync_date[strlen(date)] = 0;
+            save_state_config(0,1);
+        }
 
     }
 
-    /* date should set to recent sync message if cancel is supported*/
-    char *date = syncModel.data(syncModel.index(syncModel.rowCount()-1,3),0).toDateTime()
-    .toLocalTime().toString("ddd, d MMM yyyy H:m:s").toUtf8().data();
-    memcpy(sync_date,date,strlen(date));
-    save_state_config(0,0);
 
+    {/* date should set to recent sync message if cancel is supported*/
+        char *date = syncModel.data(syncModel.index(syncModel.rowCount()-1,3),0).toDateTime()
+                .toLocalTime().toString("ddd, d MMM yyyy H:m:s").toUtf8().data();
+        memcpy(sync_date,date,strlen(date));
+        sync_date[strlen(date)] = 0;
+        save_state_config(0,0);
+    }
+
+    sync_done:
     sms_imap_close();
     qDebug() << "Sync done";
 
