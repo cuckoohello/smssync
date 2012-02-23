@@ -19,7 +19,7 @@ const char sms_header[] = "SMS with %1";
 const char im_header[] = "Fetion with %1";
 const char call_header[] = "Call with %1";
 const char table[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-const char sync_date_format = "dd.MM.yyyy hh:mm:ss";
+const char sync_date_format[] = "dd.MM.yyyy hh:mm:ss";
 
 struct SMSSyncContact{
     QString name;
@@ -142,7 +142,7 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
 
         imap_add_contect(message,syncModel.data(syncModel.index(i,EventModel::FreeText),0).toString().toUtf8().data());
 
-        if(sms_imap_sync_one(message))
+        if(sms_imap_sync_one(message,"SMS"))
         {
             /* sync error */
             qDebug() << "Sync network error!";
