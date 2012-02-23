@@ -1,0 +1,41 @@
+IMAPAccount gmail
+Host imap.gmail.com
+User youraccount@gmail.com
+Pass yourpassword
+UseIMAPS yes
+CertificateFile ~/.mbsync/gmail.crt
+CertificateFile ~/.mbsync/secure.crt
+ 
+IMAPStore gmail-remote
+Account gmail
+
+Channel SMS
+#Channel is just an identify
+Account ring/tel/ring
+#account represents for telepathy account
+MailBox SMS
+#the mailbox your want to save the messages
+Label SMS
+#message header like "{Label} with Somebody"
+Type SMS
+#Type SMS/IM/CALL 
+
+Channel CALLLOG
+Account ring/tel/ring
+MailBox "Call log"
+Label Call
+Type CALL
+
+Channel Skype
+Account spirit/skype/account0
+MailBox "Call log"
+Label Skype
+Type CALL
+
+Channel FETION
+Account openfetion/fetion/_3123456789010
+#get the account from mc-tool list, here openfetion/fetion is a telepathy protol for China Fetion
+MailBox  SMS
+Label Fetion
+Type IM
+
