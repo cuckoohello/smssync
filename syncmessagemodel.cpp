@@ -34,15 +34,16 @@ using namespace CommHistory;
 class SyncMessageModelPrivate: public EventModelPrivate
 {
 public:
-    SyncMessageModelPrivate(EventModel* model, int _parentId, QDateTime _dtTime, bool _lastModified)
+    SyncMessageModelPrivate(EventModel* model, int _parentId,Event::EventType _type, QString _account, QDateTime _dtTime, bool _lastModified)
         : EventModelPrivate(model)
         , dtTime(_dtTime)
         , parentId(_parentId)
+        , type(_type)
+        , account(_account)
         , lastModified(_lastModified)
     {
         Event::PropertySet properties;
         properties += Event::Id;
-        properties += Event::Type;
         properties += Event::StartTime;
         properties += Event::EndTime;
         properties += Event::Direction;
@@ -80,10 +81,12 @@ public:
     QDateTime dtTime;
     int parentId;
     bool lastModified;
+    Event::EventType  type;
+    QString account;
 };
 
-SyncMessageModel::SyncMessageModel(int parentId , QDateTime time, bool lastModified ,QObject *parent)
-    : EventModel(*(new SyncMessageModelPrivate(this, parentId, time, lastModified)), parent)
+SyncMessageModel::SyncMessageModel(int parentId , Event::EventType type, QString account,QDateTime time, bool lastModified ,QObject *parent)
+    : EventModel(*(new SyncMessageModelPrivate(this, parentId, type,account,time, lastModified)), parent)
 {
 
 }
@@ -128,23 +131,30 @@ bool SyncMessageModel::getEvents()
         }
     }
 
+    if(!d->account.isEmpty())
+    {
+        const char managerFormat[] =
+                "{%2 nmo:to [nco:hasContactMedium <telepathy:/org/freedesktop/Telepathy/Account/%1>]} UNION {%2 nmo:from [nco:hasContactMedium <telepathy:/org/freedesktop/Telepathy/Account/%1>]}";
 
+        query.addPattern( QString(QLatin1String(managerFormat)).arg(d->account))
+                .variable(Event::Id);
+    }
 
-    QStringList managers;
-    const char managerFormat[] =
-            "{%2 nmo:to [nco:hasContactMedium <telepathy:/org/freedesktop/Telepathy/Account/%1>]} UNION {%2 nmo:from [nco:hasContactMedium <telepathy:/org/freedesktop/Telepathy/Account/%1>]}";
-    managers << QString(QLatin1String(managerFormat)).arg("ring/tel/ring");
-    managers << QString(QLatin1String(managerFormat)).arg("openfetion/fetion/_3159010395860");
-
-    query.addPattern(managers.join(" UNION "))
-            .variable(Event::Id);
-
-    query.addPattern(QLatin1String("{%1 rdf:type nmo:SMSMessage }"
-                                   " UNION "
-                                   "{%1 rdf:type nmo:IMMessage }"
-                                   " UNION "
-                                   "{%1 rdf:type nmo:Call}"))
-            .variable(Event::Id);
+    if(d->type)
+    {
+        switch(d->type)
+        {
+        case Event::SMSEvent:
+            query.addPattern(QLatin1String("{%1 rdf:type nmo:SMSMessage }")).variable(Event::Id);
+                    break;
+        case Event::IMEvent:
+            query.addPattern(QLatin1String("{%1 rdf:type nmo:IMMessage }")).variable(Event::Id);
+            break;
+        case Event::CallEvent:
+            query.addPattern(QLatin1String("{%1 rdf:type nmo:Call }")).variable(Event::Id);
+                    break;
+        }
+    }
 
     return d->executeQuery(query);
 }
@@ -155,4 +165,6 @@ void SyncMessageModel::setSyncMessageFilter(const SyncMessageFilter& filter)
     d->parentId = filter.parentId;
     d->dtTime = filter.time;
     d->lastModified = filter.lastModified;
+    d->type = filter.type;
+    d->account = filter.account;
 }

@@ -38,6 +38,7 @@ const char *Home;	/* for config */
 store_t *mctx;
 
 static const char Flags[] = { 'D', 'F', 'R', 'S', 'T' };
+const char table[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 static int
 parse_flags( const char *buf )
@@ -211,14 +212,13 @@ expunge( store_t *ctx, store_t *rctx )
 //if ((ret = sync_new( chan->mops, sctx, mctx, chan->master, jfp, &srecadd, 0, &smaxuid )) != SYNC_OK ||
 //   (ret = sync_new( chan->sops, mctx, sctx, chan->slave, jfp, &srecadd, 1, &mmaxuid )) != SYNC_OK)
 int
-sms_imap_sync_one(const char *message,const char* box)
+sms_imap_sync_one(const char *message)
 {
     driver_t *tdriver = mctx->conf->driver;
     int  uid;
 
     msg_data_t msgdata;
 
-    mctx->name = box;
     char *copy = malloc(strlen(message)+1);
     memcpy(copy,message,strlen(message));
     *(copy+strlen(message)) = 0;
@@ -247,24 +247,57 @@ clean_strdup( const char *s )
 	return cs;
 }
 
-int sms_imap_prepare()
+int sms_imap_config()
 {
-	store_conf_t *mconf;
-	driver_t *mdriver;
-    int ret = 0;
-
+    int i = 0;
 	if (!(Home = getenv("HOME"))) {
 		fputs( "Fatal: $HOME not set\n", stderr );
 		return 1;
 	}
 
 	if (load_config( 0, 0 ))
+    {
+        fprintf( stderr, "config error\n");
 		return 1;
-
-    arc4_init();
+    }
 
     if(!stores || !stores->driver)
+    {
+        fprintf(stderr,"No imap server configured");
         return 1;
+    }
+
+    if(!channels)
+    {
+        fprintf(stderr,"No channels defined");
+        return 1;
+    }
+
+    if(load_state_config(0,0))
+    {
+        fprintf(stderr,"First time sync");
+        srandom(time(NULL));
+        for(i=0 ;i <24;i++)
+            stores->prefrence[i] = table[rand()%strlen(table)];
+        stores->prefrence[24] = 0;
+    }
+
+    if(!*stores->prefrence)
+    {
+        fprintf(stderr,"state file format error,please rm ~/.mbsync.state first!");
+        return 1;
+    }
+
+    return 0;
+}
+
+int sms_imap_init()
+{
+    store_conf_t *mconf;
+    driver_t *mdriver;
+    int ret = 0;
+
+    arc4_init();
 
     mconf = stores;
     mdriver = mconf->driver;
@@ -272,14 +305,6 @@ int sms_imap_prepare()
         ret = 1;
         goto next;
     }
-
-    info( "Channel %s\n", smsLabel);
-
-	mctx->uidvalidity = 0;
-
-	if (!smsLabel || (mctx->conf->map_inbox && !strcmp( mctx->conf->map_inbox, smsLabel )))
-		smsLabel = "INBOX";
-	mctx->name = smsLabel;
 	mdriver->prepare( mctx, OPEN_SIZE | OPEN_CREATE | OPEN_FLAGS );
 
     /*
@@ -297,6 +322,19 @@ next:
         mdriver->close_store( mctx );
 
     return ret;
+}
+
+int sms_imap_select_mailbox(const char* mailBox)
+{
+    info( "Select MailBox %s\n", mailBox);
+
+    mctx->uidvalidity = 0;
+
+    if(mailBox && *mailBox)
+        mctx->name = mailBox;
+    else
+        mctx->name = "INBOX";
+    return 0;
 }
 
 void sms_imap_close()

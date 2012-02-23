@@ -34,11 +34,15 @@ struct  SyncMessageFilter
     int parentId;
     QDateTime time;
     bool lastModified;
+    Event::EventType type;
+    QString account;
 
-    SyncMessageFilter(int _parentId = INBOX, QDateTime _time= QDateTime(), bool _lastModified = false)
+    SyncMessageFilter(int _parentId = INBOX, Event::EventType _type = Event::SMSEvent , QString _account = QString("ring/tel/ring") , QDateTime _time= QDateTime(), bool _lastModified = false)
         :parentId(_parentId),
-        time(_time),
-        lastModified(_lastModified)
+          type(_type),
+          account(_account),
+          time(_time),
+          lastModified(_lastModified)
     {
     }
 
@@ -59,7 +63,7 @@ public:
      *
      * \param parent Parent object.
      */
-    SyncMessageModel(int parentId = INBOX, QDateTime time= QDateTime(), bool lastModified = false, QObject *parent = 0);
+    SyncMessageModel(int parentId = INBOX, Event::EventType  _type = Event::SMSEvent, QString _account = QString("ring/tel/ring"),QDateTime time= QDateTime(), bool lastModified = false, QObject *parent = 0);
 
     /*!
      * Destructor.

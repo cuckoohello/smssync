@@ -81,6 +81,7 @@ typedef struct store_conf {
 	char *trash;
 	unsigned max_size; /* off_t is overkill */
 	unsigned trash_remote_new:1, trash_only_new:1;
+    char prefrence[25]; /* prefrence is 24 bit */
 } store_conf_t;
 
 typedef struct string_list {
@@ -91,12 +92,11 @@ typedef struct string_list {
 typedef struct channel_conf {
 	struct channel_conf *next;
 	char *name;
-	store_conf_t *master, *slave;
-	char *master_name, *slave_name;
-	char *sync_state;
-	string_list_t *patterns;
-	int mops, sops;
-	unsigned max_messages; /* for slave only */
+    char *account;
+    char *mail_box;
+    char *label;
+    char *type;
+    char sync_time[25];
 } channel_conf_t;
 
 typedef struct group_conf {
@@ -239,11 +239,7 @@ int sync_boxes( store_t *, const char *,
 /* config.c */
 
 extern channel_conf_t *channels;
-extern group_conf_t *groups;
-extern int global_mops, global_sops;
-extern char *global_sync_state;
 extern store_conf_t *stores;
-extern char *smsLabel;
 
 int parse_bool( conffile_t *cfile );
 int parse_int( conffile_t *cfile );
@@ -256,11 +252,12 @@ void parse_generic_store( store_conf_t *store, conffile_t *cfg, int *err );
 /* drv_*.c */
 extern driver_t maildir_driver, imap_driver;
 int
-sms_imap_sync_one(const char *message,const char* box);
+sms_imap_sync_one(const char *message);
 void sms_imap_close();
-int sms_imap_prepare();
+int sms_imap_init();
+int sms_imap_config();
+int sms_imap_select_mailbox(const char* mailBox);
 
-extern char prefrence[50];
 extern char sync_date[50];
 int
 save_state_config( const char *where, int pseudo );

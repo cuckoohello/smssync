@@ -34,12 +34,6 @@
 
 store_conf_t *stores;
 channel_conf_t *channels;
-group_conf_t *groups;
-int global_mops, global_sops;
-char *global_sync_state;
-char *smsLabel;
-char prefrence[50];
-char sync_date[50];
 
 int
 parse_bool( conffile_t *cfile )
@@ -94,84 +88,6 @@ parse_size( conffile_t *cfile )
 	return ret;
 }
 
-static int
-getopt_helper( conffile_t *cfile, int *cops, int *mops, int *sops, char **sync_state )
-{
-	char *arg;
-
-	if (!strcasecmp( "Sync", cfile->cmd )) {
-		arg = cfile->val;
-		do
-			if (!strcasecmp( "Push", arg ))
-				*cops |= XOP_PUSH;
-			else if (!strcasecmp( "Pull", arg ))
-				*cops |= XOP_PULL;
-			else if (!strcasecmp( "ReNew", arg ))
-				*cops |= OP_RENEW;
-			else if (!strcasecmp( "New", arg ))
-				*cops |= OP_NEW;
-			else if (!strcasecmp( "Delete", arg ))
-				*cops |= OP_DELETE;
-			else if (!strcasecmp( "Flags", arg ))
-				*cops |= OP_FLAGS;
-			else if (!strcasecmp( "PullReNew", arg ))
-				*sops |= OP_RENEW;
-			else if (!strcasecmp( "PullNew", arg ))
-				*sops |= OP_NEW;
-			else if (!strcasecmp( "PullDelete", arg ))
-				*sops |= OP_DELETE;
-			else if (!strcasecmp( "PullFlags", arg ))
-				*sops |= OP_FLAGS;
-			else if (!strcasecmp( "PushReNew", arg ))
-				*mops |= OP_RENEW;
-			else if (!strcasecmp( "PushNew", arg ))
-				*mops |= OP_NEW;
-			else if (!strcasecmp( "PushDelete", arg ))
-				*mops |= OP_DELETE;
-			else if (!strcasecmp( "PushFlags", arg ))
-				*mops |= OP_FLAGS;
-			else if (!strcasecmp( "All", arg ) || !strcasecmp( "Full", arg ))
-				*cops |= XOP_PULL|XOP_PUSH;
-			else if (strcasecmp( "None", arg ) && strcasecmp( "Noop", arg ))
-				fprintf( stderr, "%s:%d: invalid Sync arg '%s'\n",
-				         cfile->file, cfile->line, arg );
-		while ((arg = next_arg( &cfile->rest )));
-		*mops |= XOP_HAVE_TYPE;
-	} else if (!strcasecmp( "Expunge", cfile->cmd )) {
-		arg = cfile->val;
-		do
-			if (!strcasecmp( "Both", arg ))
-				*cops |= OP_EXPUNGE;
-			else if (!strcasecmp( "Master", arg ))
-				*mops |= OP_EXPUNGE;
-			else if (!strcasecmp( "Slave", arg ))
-				*sops |= OP_EXPUNGE;
-			else if (strcasecmp( "None", arg ))
-				fprintf( stderr, "%s:%d: invalid Expunge arg '%s'\n",
-				         cfile->file, cfile->line, arg );
-		while ((arg = next_arg( &cfile->rest )));
-		*mops |= XOP_HAVE_EXPUNGE;
-	} else if (!strcasecmp( "Create", cfile->cmd )) {
-		arg = cfile->val;
-		do
-			if (!strcasecmp( "Both", arg ))
-				*cops |= OP_CREATE;
-			else if (!strcasecmp( "Master", arg ))
-				*mops |= OP_CREATE;
-			else if (!strcasecmp( "Slave", arg ))
-				*sops |= OP_CREATE;
-			else if (strcasecmp( "None", arg ))
-				fprintf( stderr, "%s:%d: invalid Create arg '%s'\n",
-				         cfile->file, cfile->line, arg );
-		while ((arg = next_arg( &cfile->rest )));
-		*mops |= XOP_HAVE_CREATE;
-	} else if (!strcasecmp( "SyncState", cfile->cmd ))
-		*sync_state = expand_strdup( cfile->val );
-	else
-		return 0;
-	return 1;
-}
-
 int
 getcline( conffile_t *cfile )
 {
@@ -193,18 +109,6 @@ getcline( conffile_t *cfile )
 		return 1;
 	}
 	return 0;
-}
-
-int
-mygetline( conffile_t *cfile )
-{
-    char *p;
-
-    while (fgets( cfile->buf, cfile->bufl, cfile->fp )) {
-        cfile->line++;
-        return 1;
-    }
-    return 0;
 }
 
 /* XXX - this does not detect None conflicts ... */
@@ -268,6 +172,7 @@ load_config( const char *where, int pseudo )
 {
 	conffile_t cfile;
     store_conf_t *store, **storeapp = &stores;
+    channel_conf_t *channel, **channelapp = &channels;
     int err;
     char path[_POSIX_PATH_MAX];
 	char buf[1024];
@@ -303,11 +208,32 @@ load_config( const char *where, int pseudo )
 				storeapp = &store->next;
 				*storeapp = 0;
 			}
-		}
-		else if (!strcasecmp( "SMSLabel", cfile.cmd ))
-		{
-			smsLabel = nfstrdup( cfile.val );
-		}
+        }else if (!strcasecmp( "Channel", cfile.cmd ))
+        {
+            channel = nfcalloc( sizeof(*channel) );
+            memset(channel,0,sizeof(channel));
+            channel->name = nfstrdup( cfile.val );
+            while (getcline( &cfile ) && cfile.cmd) {
+                if (!strcasecmp( "Account", cfile.cmd ))
+                    channel->account = nfstrdup(cfile.val);
+                else if (!strcasecmp( "MailBox", cfile.cmd ))
+                    channel->mail_box = nfstrdup(cfile.val);
+                else if (!strcasecmp( "Label", cfile.cmd ))
+                    channel->label = nfstrdup(cfile.val);
+                else if (!strcasecmp( "Type", cfile.cmd ))
+                    channel->type = nfstrdup(cfile.val);
+            }
+
+            if(!channel->name || !channel->account || !channel->mail_box || !channel->label || !channel->type )
+            {
+                fprintf( stderr, "channel '%s' setting error\n", channel->name );
+                err = 1;
+            }
+            else {
+                *channelapp = channel;
+                channelapp = &channel->next;
+            }
+        }
 	}
     fclose (cfile.fp);
 	return err;
@@ -320,8 +246,8 @@ load_state_config( const char *where, int pseudo )
     int err;
     char path[_POSIX_PATH_MAX];
     char buf[1024];
-    memset(prefrence,0,50);
-    memset(sync_date,0,50);
+    char *sync_time;
+    channel_conf_t *channel;
 
     if (!where) {
         nfsnprintf( path, sizeof(path), "%s/." EXE ".state", Home );
@@ -342,18 +268,32 @@ load_state_config( const char *where, int pseudo )
     cfile.line = 0;
 
     err = 0;
+    memset(stores->prefrence,0,25);
 
-    if(mygetline(&cfile))
-    {
-        memcpy(prefrence,cfile.buf,strlen(cfile.buf));
-        prefrence[24] = 0;
-    }else
-        err = 2;
-    if(mygetline(&cfile))
-    {
-        memcpy(sync_date,cfile.buf,strlen(cfile.buf));
-    }else
-        err = 3;
+    while (getcline( &cfile )) {
+        if (!cfile.cmd)
+            continue;
+        if (!strcasecmp( "Preference", cfile.cmd ))
+        {
+            memcpy(stores->prefrence,cfile.val,24);
+        }else if(!strcasecmp("Channel",cfile.cmd))
+        {
+            if(!(sync_time = next_arg(&cfile.rest)))
+            {
+                fprintf( stderr, "%s:%d: channel %s time missing\n",
+                         cfile.file, cfile.line,cfile.val);
+                continue;
+            }
+            for(channel=channels;channel;channel=channel->next)
+            {
+                if(!strcasecmp(channel->name, cfile.val))
+                {
+                    memcpy(channel->sync_time,sync_time,strlen(sync_time));
+                    break;
+                }
+            }
+        }
+    }
     fclose (cfile.fp);
     return err;
 }
@@ -364,6 +304,9 @@ save_state_config( const char *where, int pseudo )
     conffile_t cfile;
     int err;
     char path[_POSIX_PATH_MAX];
+    char message[100];
+
+    channel_conf_t *channel;
 
     if (!where) {
         nfsnprintf( path, sizeof(path), "%s/." EXE ".state", Home );
@@ -378,10 +321,18 @@ save_state_config( const char *where, int pseudo )
         perror( "Cannot open config file" );
         return 1;
     }
-
-    fputs(prefrence,cfile.fp);
-    fputc('\n',cfile.fp);
-    fputs(sync_date,cfile.fp);
+    memset(message,0,sizeof(message));
+    sprintf(message,"Preference %s\n",stores->prefrence);
+    fputs(message,cfile.fp);
+    for(channel=channels;channel;channel=channel->next)
+    {
+        if(channel->sync_time && *channel->sync_time)
+        {
+            memset(message,0,sizeof(message));
+            sprintf(message,"Channel %s %s\n",channel->name,channel->sync_time);
+            fputs(message,cfile.fp);
+        }
+    }
 
     fclose (cfile.fp);
     return err;
