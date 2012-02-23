@@ -18,7 +18,7 @@ QTM_USE_NAMESPACE;
 
 const char refrence_format[] = "%1.%2@n9-sms-backup-local";
 const char message_header_format[] = "%1 with %2";
-const char sync_date_format[] = "yyyy-MM-dd-hh:mm:ss";
+const char sync_date_format[] = "yyyy-MM-dd-hh:mm:ss:zzz";
 
 struct SMSSyncContact{
     QString name;
@@ -78,7 +78,6 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
     QHash<QString,struct SMSSyncContact> contactPool;
 
     channel_conf_t *channel;
-    bool isFirstSync;
 
     if(sms_imap_init())
     {
@@ -88,10 +87,6 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
 
     for(channel=channels;channel;channel=channel->next)
     {
-        if(channel->sync_time && *channel->sync_time)
-            isFirstSync = false;
-        else
-            isFirstSync = true;
         qDebug() << "Channel "<<channel->name;
         Event::EventType eventType;
         if(!strcasecmp( channel->type, "SMS"))
@@ -110,16 +105,14 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
         sms_imap_select_mailbox(channel->mail_box);
 
         SyncMessageModel syncModel(ALL,eventType,channel->account,
-                                   isFirstSync ? QDateTime():QDateTime().fromString(QString(channel->sync_time),sync_date_format));
+                                   QDateTime().fromString(QString(channel->sync_time),sync_date_format));
 
         syncModel.setQueryMode(EventModel::SyncQuery);
         syncModel.getEvents();
-        int total = isFirstSync ? syncModel.rowCount() :  syncModel.rowCount() -1;
-        if(total < 0)
-            total = 0;
-        qDebug() << "Total " << total <<" messages need to sync!";
 
-        for (int i= isFirstSync ? 0 :1 ;i < syncModel.rowCount();i++)
+        qDebug() << "Total " << syncModel.rowCount() <<" messages need to sync!";
+
+        for (int i= 0 ;i < syncModel.rowCount();i++)
         {
 
             memset(message,0,8192);
@@ -216,29 +209,21 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
             {
                 /* sync error */
                 qDebug() << "Sync network error!";
-                char *date = syncModel.data(syncModel.index(i,EventModel::EndTime),0).toDateTime()
+                char *date = syncModel.data(syncModel.index(i-1,EventModel::EndTime),0).toDateTime()
                 .toLocalTime().toString(sync_date_format).toUtf8().data();
                 memcpy(channel->sync_time,date,strlen(date));
                 channel->sync_time[strlen(date)] = 0;
                 save_state_config(0,0);
                 break;
             }
-            if(syncModel.rowCount()-i <= 10 || i%10 == (isFirstSync ? 0 : 1))
-                qDebug() << (isFirstSync ? i : i-1) << "/" <<total <<" synced!";
+            if(syncModel.rowCount()-i <= 10 || (i%10 == 9))
+                qDebug() << (i+1) << "/" <<syncModel.rowCount() <<" synced!";
 
-            if(i%10 == (isFirstSync ? 0 : 1))
+            if((i%10 == 9) || (i == syncModel.rowCount()-1))
             {
                 /* backup status every 10 backups */
                 char *date = syncModel.data(syncModel.index(i,EventModel::EndTime),0).toDateTime()
-                .toLocalTime().toString(sync_date_format).toUtf8().data();
-                memcpy(channel->sync_time,date,strlen(date));
-                channel->sync_time[strlen(date)] = 0;
-                save_state_config(0,1);
-            }
-            if(i == syncModel.rowCount()-1)
-            {
-                char *date = syncModel.data(syncModel.index(i,EventModel::EndTime),0).toDateTime()
-                .toLocalTime().toString(sync_date_format).toUtf8().data();
+                        .toLocalTime().toString(sync_date_format).toUtf8().data();
                 memcpy(channel->sync_time,date,strlen(date));
                 channel->sync_time[strlen(date)] = 0;
                 save_state_config(0,1);

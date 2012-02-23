@@ -112,7 +112,7 @@ bool SyncMessageModel::getEvents()
 
     if (d->lastModified) {
         if (!d->dtTime.isNull()) { //get all last modified messages after time t1
-            query.addPattern(QString(QLatin1String("FILTER(tracker:added(%2) <= \"%1\"^^xsd:dateTime)"))
+            query.addPattern(QString(QLatin1String("FILTER(nmo:receivedDate(%2) <= \"%1\"^^xsd:dateTime)"))
                              .arg(d->dtTime.toUTC().toString(Qt::ISODate)))
                     .variable(Event::Id);
             query.addPattern(QString(QLatin1String("FILTER(nie:contentLastModified(%2) > \"%1\"^^xsd:dateTime)"))
@@ -125,7 +125,7 @@ bool SyncMessageModel::getEvents()
         }
     } else {
         if (!d->dtTime.isNull()) { //get all messages after time t1(including modified)
-            query.addPattern(QString(QLatin1String("FILTER(tracker:added(%2) > \"%1\"^^xsd:dateTime)"))
+            query.addPattern(QString(QLatin1String("FILTER(nmo:receivedDate(%2) > \"%1\"^^xsd:dateTime)"))
                              .arg(d->dtTime.toUTC().toString(Qt::ISODate)))
                     .variable(Event::Id);
         }
@@ -155,6 +155,11 @@ bool SyncMessageModel::getEvents()
                     break;
         }
     }
+
+    query.addModifier("ORDER BY ASC(%1) ASC(tracker:id(%2))")
+                     .variable(Event::EndTime)
+                     .variable(Event::Id);
+
 
     return d->executeQuery(query);
 }
