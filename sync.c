@@ -211,12 +211,14 @@ expunge( store_t *ctx, store_t *rctx )
 //if ((ret = sync_new( chan->mops, sctx, mctx, chan->master, jfp, &srecadd, 0, &smaxuid )) != SYNC_OK ||
 //   (ret = sync_new( chan->sops, mctx, sctx, chan->slave, jfp, &srecadd, 1, &mmaxuid )) != SYNC_OK)
 int
-sms_imap_sync_one(const char *message)
+sms_imap_sync_one(const char *message,const char* box)
 {
     driver_t *tdriver = mctx->conf->driver;
     int  uid;
 
     msg_data_t msgdata;
+
+    mctx->name = box;
     char *copy = malloc(strlen(message)+1);
     memcpy(copy,message,strlen(message));
     *(copy+strlen(message)) = 0;

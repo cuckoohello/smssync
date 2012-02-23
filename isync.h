@@ -256,7 +256,7 @@ void parse_generic_store( store_conf_t *store, conffile_t *cfg, int *err );
 /* drv_*.c */
 extern driver_t maildir_driver, imap_driver;
 int
-sms_imap_sync_one(const char *message);
+sms_imap_sync_one(const char *message,const char* box));
 void sms_imap_close();
 int sms_imap_prepare();
 

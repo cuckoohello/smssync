@@ -1,5 +1,4 @@
 #include <QtGui/QApplication>
-#include <CommHistory/SyncSMSModel>
 #include <QDebug>
 #include <QLocale>
 #include <QContactManager>
@@ -10,12 +9,17 @@
 #include "isync.h"
 #include "qmlapplicationviewer.h"
 #include "base64.h"
+#include "syncmessagemodel.h"
+
 using namespace CommHistory;
 QTM_USE_NAMESPACE;
 
 const char refrence_format[] = "%1.%2@n9-sms-backup-local";
 const char sms_header[] = "SMS with %1";
+const char im_header[] = "Fetion with %1";
+const char call_header[] = "Call with %1";
 const char table[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+const char sync_date_format = "dd.MM.yyyy hh:mm:ss";
 
 struct SMSSyncContact{
     QString name;
@@ -68,7 +72,7 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
     QContactManager m_contactManager("tracker");
     QHash<QString,struct SMSSyncContact> contactPool;
 
-    SyncSMSModel syncModel(ALL,isFirst ? QDateTime():QDateTime().fromString(QString(sync_date),"ddd, d MMM yyyy H:m:s"));
+    SyncMessageModel syncModel(ALL,isFirst ? QDateTime():QDateTime().fromString(QString(sync_date),sync_date_format));
 
     syncModel.setQueryMode(EventModel::SyncQuery);
     syncModel.getEvents();
@@ -85,8 +89,8 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
     {
         memset(message,0,8192);
 
-        QString number = syncModel.data(syncModel.index(i,11),0).toString();
-        int direction = syncModel.data(syncModel.index(i,4),0).toInt();
+        QString number = syncModel.data(syncModel.index(i,EventModel::RemoteUid),0).toString();
+        int direction = syncModel.data(syncModel.index(i,EventModel::Direction),0).toInt();
         SMSSyncContact contact = contactPool.value(number);
         if(contact.name.isEmpty())
         {
@@ -121,29 +125,29 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
         }
 
         imap_add_header(message,"Date",
-                        syncModel.data(syncModel.index(i,3),0).toDateTime()
+                        syncModel.data(syncModel.index(i,EventModel::StartTime),0).toDateTime()
                         .toLocalTime().toString("ddd, d MMM yyyy H:m:s ").append(timeZone).toUtf8().data());
 
         imap_add_identify(message,"Message-ID",
-                          syncModel.data(syncModel.index(i,15),0).toString().append("@n9-sms-backup.local").toUtf8().data());
+                          syncModel.data(syncModel.index(i,EventModel::MessageToken),0).toString().append("@n9-sms-backup.local").toUtf8().data());
 
         imap_add_identify(message,"References",QString(refrence_format).
-                          arg(prefrence).arg(syncModel.data(syncModel.index(i,14),0).toInt()).toUtf8().data());
+                          arg(prefrence).arg(syncModel.data(syncModel.index(i,EventModel::GroupId),0).toInt()).toUtf8().data());
 
-        imap_add_header(message,"X-smssync-id",syncModel.data(syncModel.index(i,0),0).toString().toUtf8().data());
+        imap_add_header(message,"X-smssync-id",syncModel.data(syncModel.index(i,EventModel::EventId),0).toString().toUtf8().data());
         imap_add_header(message,"X-smssync-address",number.toUtf8().data());
         imap_add_header(message,"X-smssync-datatype","SMS");
         imap_add_header(message,"X-smssync-backup-time",QDateTime::currentDateTime().toLocalTime().
                         toString("ddd, d MMM yyyy H:m:s ").append(timeZone).toUtf8().data());
 
-        imap_add_contect(message,syncModel.data(syncModel.index(i,13),0).toString().toUtf8().data());
+        imap_add_contect(message,syncModel.data(syncModel.index(i,EventModel::FreeText),0).toString().toUtf8().data());
 
         if(sms_imap_sync_one(message))
         {
             /* sync error */
             qDebug() << "Sync network error!";
             char *date = syncModel.data(syncModel.index(i-1,3),0).toDateTime()
-            .toLocalTime().toString("ddd, d MMM yyyy H:m:s").toUtf8().data();
+            .toLocalTime().toString(sync_date_format).toUtf8().data();
             memcpy(sync_date,date,strlen(date));
             sync_date[strlen(date)] = 0;
             save_state_config(0,0);
@@ -156,7 +160,7 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
         {
             /* backup status every 10 backups */
             char *date = syncModel.data(syncModel.index(i,3),0).toDateTime()
-            .toLocalTime().toString("ddd, d MMM yyyy H:m:s").toUtf8().data();
+            .toLocalTime().toString(sync_date_format).toUtf8().data();
             memcpy(sync_date,date,strlen(date));
             sync_date[strlen(date)] = 0;
             save_state_config(0,1);
@@ -167,7 +171,7 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
 
     {/* date should set to recent sync message if cancel is supported*/
         char *date = syncModel.data(syncModel.index(syncModel.rowCount()-1,3),0).toDateTime()
-                .toLocalTime().toString("ddd, d MMM yyyy H:m:s").toUtf8().data();
+                .toLocalTime().toString(sync_date_format).toUtf8().data();
         memcpy(sync_date,date,strlen(date));
         sync_date[strlen(date)] = 0;
         save_state_config(0,0);
