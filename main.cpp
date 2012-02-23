@@ -48,7 +48,7 @@ QString getTimeZone()
 QString createMessageId(QDateTime time,QString address,int type)
 {
     return QString("%1-%2-%3").
-            arg(time.toUTC().toString("dd-MM-yyyy-hh-mm-ss-zzz")).arg(address).arg(type);
+            arg(time.toUTC().toString("yyyy-MM-dd-hh-mm-ss-zzz")).arg(address).arg(type);
 }
 
 QContactFilter IMAccountFilter(const QString &id)
@@ -118,7 +118,7 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
             if (contacts.isEmpty())
             {
                 contact.name = number;
-                contact.email = number.append("@unknown.email");
+                contact.email = QString(number).append("@unknown.email");
             }
             else
             {
@@ -127,7 +127,7 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
                     contact.name = number;
                 contact.email = ((QContactEmailAddress)contacts.first().detail<QContactEmailAddress>()).emailAddress();
                 if(contact.email.isEmpty())
-                    contact.email = number.append("@unknown.email");
+                    contact.email = QString(number).append("@unknown.email");
 
             }
             contactPool.insert(number,contact);
@@ -194,7 +194,32 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
         imap_add_header(message,"X-smssync-backup-time",QDateTime::currentDateTime().toLocalTime().
                         toString("ddd, d MMM yyyy H:m:s ").append(timeZone).toUtf8().data());
 
-        imap_add_contect(message,syncModel.data(syncModel.index(i,EventModel::FreeText),0).toString().toUtf8().data());
+        if(eventType != Event::CallEvent)
+            imap_add_contect(message,syncModel.data(syncModel.index(i,EventModel::FreeText),0).toString().toUtf8().data());
+        else
+        {
+            QString content;
+            if ((direction == Event::Outbound)  || !syncModel.data(syncModel.index(i,EventModel::IsMissedCall)).toBool())
+            {
+                QDateTime start = syncModel.data(syncModel.index(i,EventModel::StartTime),0).toDateTime();
+                QDateTime end = syncModel.data(syncModel.index(i,EventModel::EndTime),0).toDateTime();
+                int seconds = start.secsTo(end);
+                if(seconds<0)
+                    seconds = -seconds;
+                int mins = seconds/60;
+                int secs = seconds%60;
+                int hours = mins/60;
+                mins %= 60;
+                content = content.sprintf("%ds(%02d:%02d:%02d)\n",seconds,hours,mins,secs);
+            }
+            if(direction == Event::Outbound)
+                content.append(number).append("(Outgoing Call)");
+            else if(syncModel.data(syncModel.index(i,EventModel::IsMissedCall)).toBool())
+                content.append(number).append("(Missed Call)");
+            else
+                content.append(number).append("(Incoming Call)");
+            imap_add_contect(message,content.toUtf8().data());
+        }
 
         if(sms_imap_sync_one(message,(eventType == Event::CallEvent) ? "Call log" : "SMS"))
         {
