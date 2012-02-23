@@ -212,7 +212,7 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
             {
                 /* sync error */
                 qDebug() << "Sync network error!";
-                char *date = syncModel.data(syncModel.index(i-1,EventModel::EndTime),0).toDateTime()
+                char *date = syncModel.data(syncModel.index(i,EventModel::EndTime),0).toDateTime()
                 .toLocalTime().toString(sync_date_format).toUtf8().data();
                 memcpy(channel->sync_time,date,strlen(date));
                 channel->sync_time[strlen(date)] = 0;
@@ -225,7 +225,7 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
             if(i%10 == (isFirstSync ? 0 : 1))
             {
                 /* backup status every 10 backups */
-                char *date = syncModel.data(syncModel.index(i-1,EventModel::EndTime),0).toDateTime()
+                char *date = syncModel.data(syncModel.index(i,EventModel::EndTime),0).toDateTime()
                 .toLocalTime().toString(sync_date_format).toUtf8().data();
                 memcpy(channel->sync_time,date,strlen(date));
                 channel->sync_time[strlen(date)] = 0;
@@ -233,7 +233,7 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
             }
             if(i == syncModel.rowCount()-1)
             {
-                char *date = syncModel.data(syncModel.index(i-1,EventModel::EndTime),0).toDateTime()
+                char *date = syncModel.data(syncModel.index(i,EventModel::EndTime),0).toDateTime()
                 .toLocalTime().toString(sync_date_format).toUtf8().data();
                 memcpy(channel->sync_time,date,strlen(date));
                 channel->sync_time[strlen(date)] = 0;
