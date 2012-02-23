@@ -24,7 +24,7 @@
 #include <CommHistory/eventmodel_p.h>
 #include <CommHistory/TrackerIO>
 #include <CommHistory/eventsquery.h>
-
+#include <CommHistory/Group>
 #include "syncmessagemodel.h"
 
 
@@ -46,25 +46,18 @@ public:
         properties += Event::StartTime;
         properties += Event::EndTime;
         properties += Event::Direction;
-        properties += Event::IsDraft;
-        properties += Event::IsRead;
+        properties += Event::IsMissedCall;
         properties += Event::LocalUid;
         properties += Event::RemoteUid;
-        properties += Event::ParentId;
         properties += Event::FreeText;
         properties += Event::GroupId;
-        properties += Event::LastModified;
-        properties += Event::Encoding;
-        properties += Event::CharacterSet;
-        properties += Event::Language;
+        properties += Event::MessageToken;
+
         propertyMask = properties;
     }
 
     bool acceptsEvent(const Event &event) const {
         qDebug() << __PRETTY_FUNCTION__ << event.id();
-
-        if (event.type() != Event::IMEvent)
-            return false;
 
         if (!lastModified) {
             if (!dtTime.isNull()) {
@@ -135,7 +128,22 @@ bool SyncMessageModel::getEvents()
         }
     }
 
-    query.addPattern(QLatin1String("%1 rdf:type nmo:SMSMessage ."))
+
+
+    QStringList managers;
+    const char managerFormat[] =
+            "{%2 nmo:to [nco:hasContactMedium <telepathy:/org/freedesktop/Telepathy/Account/%1>]} UNION {%2 nmo:from [nco:hasContactMedium <telepathy:/org/freedesktop/Telepathy/Account/%1>]}";
+    managers << QString(QLatin1String(managerFormat)).arg("ring/tel/ring");
+    managers << QString(QLatin1String(managerFormat)).arg("openfetion/fetion/_3159010395860");
+
+    query.addPattern(managers.join(" UNION "))
+            .variable(Event::Id);
+
+    query.addPattern(QLatin1String("{%1 rdf:type nmo:SMSMessage }"
+                                   " UNION "
+                                   "{%1 rdf:type nmo:IMMessage }"
+                                   " UNION "
+                                   "{%1 rdf:type nmo:Call}"))
             .variable(Event::Id);
 
     return d->executeQuery(query);
