@@ -113,6 +113,8 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
         syncModel.setQueryMode(EventModel::SyncQuery);
         syncModel.getEvents();
         int total = isFirstSync ? syncModel.rowCount() :  syncModel.rowCount() -1;
+        if(total < 0)
+            total = 0;
         qDebug() << "Total " << total <<" messages need to sync!";
 
         for (int i= isFirstSync ? 0 :1 ;i < syncModel.rowCount();i++)
