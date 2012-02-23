@@ -113,7 +113,23 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
             }
             contactPool.insert(number,contact);
         }
-        imap_create_header(message, QString(sms_header).arg(contact.name).toUtf8().data());
+        int eventType = syncModel.data(syncModel.index(i,EventModel::EventType),0).toInt();
+        switch(eventType)
+        {
+        case Event::SMSEvent:
+            imap_create_header(message, QString(sms_header).arg(contact.name).toUtf8().data());
+            break;
+        case Event::IMEvent:
+            imap_create_header(message, QString(im_header).arg(contact.name).toUtf8().data());
+            break;
+        case Event::CallEvent:
+            imap_create_header(message, QString(call_header).arg(contact.name).toUtf8().data());
+            break;
+        default:
+            qDebug() << i << " unkown Event type "<<eventType;
+
+        }
+
         if (direction == Event::Inbound)
         {
             imap_add_address(message,"From",contact.name.toUtf8().data(),contact.email.toUtf8().data());
@@ -136,13 +152,27 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
 
         imap_add_header(message,"X-smssync-id",syncModel.data(syncModel.index(i,EventModel::EventId),0).toString().toUtf8().data());
         imap_add_header(message,"X-smssync-address",number.toUtf8().data());
-        imap_add_header(message,"X-smssync-datatype","SMS");
+        switch(eventType)
+        {
+        case Event::SMSEvent:
+            imap_add_header(message,"X-smssync-datatype","SMS");
+            break;
+        case Event::IMEvent:
+            imap_add_header(message,"X-smssync-datatype","FETION");
+            break;
+        case Event::CallEvent:
+            imap_add_header(message,"X-smssync-datatype","CALLLOG");
+            break;
+        default:
+            qDebug() << i << " unkown Event type "<<eventType;
+        }
+
         imap_add_header(message,"X-smssync-backup-time",QDateTime::currentDateTime().toLocalTime().
                         toString("ddd, d MMM yyyy H:m:s ").append(timeZone).toUtf8().data());
 
         imap_add_contect(message,syncModel.data(syncModel.index(i,EventModel::FreeText),0).toString().toUtf8().data());
 
-        if(sms_imap_sync_one(message,"SMS"))
+        if(sms_imap_sync_one(message,(eventType == Event::CallEvent) ? "Call log" : "SMS"))
         {
             /* sync error */
             qDebug() << "Sync network error!";
