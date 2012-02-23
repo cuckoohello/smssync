@@ -60,7 +60,9 @@ QContactFilter IMAccountFilter(const QString &id)
 Q_DECL_EXPORT int main(int argc, char *argv[])
 {
    // QLocale::setDefault(QLocale(QLocale::English,QLocale::UnitedStates));
-    QScopedPointer<QApplication> app(createApplication(argc, argv));
+   // QScopedPointer<QApplication> app(createApplication(argc, argv));
+    QCoreApplication app(argc, argv);
+
 
     char message[8192]; // This should be large enough for messages
     if(sms_imap_config())
