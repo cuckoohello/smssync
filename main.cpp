@@ -5,6 +5,8 @@
 #include <QContactPhoneNumber>
 #include <QContact>
 #include <QContactEmailAddress>
+#include <QContactOnlineAccount>
+#include <QContactDetailFilter>
 #include <QFile>
 #include "isync.h"
 #include "qmlapplicationviewer.h"
@@ -42,6 +44,21 @@ QString getTimeZone()
         return QString().sprintf("+%d%02d",offset/60,offset%60);
     }
  }
+
+QString createMessageId(QDateTime time,QString address,int type)
+{
+    return QString("%1-%2-%3").
+            arg(time.toUTC().toString("dd-MM-yyyy-hh-mm-ss-zzz")).arg(address).arg(type);
+}
+
+QContactFilter IMAccountFilter(const QString &id)
+{
+    QContactDetailFilter l;
+    l.setDetailDefinitionName(QContactOnlineAccount::DefinitionName, QContactOnlineAccount::FieldAccountUri);
+    l.setValue(id);
+    l.setMatchFlags(QContactFilter::MatchExactly);
+    return l;
+}
 
 Q_DECL_EXPORT int main(int argc, char *argv[])
 {
@@ -87,6 +104,8 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
 
     for (int i= isFirst ? 0 :1 ;i < syncModel.rowCount();i++)
     {
+        int eventType = syncModel.data(syncModel.index(i,EventModel::EventType),0).toInt();
+
         memset(message,0,8192);
 
         QString number = syncModel.data(syncModel.index(i,EventModel::RemoteUid),0).toString();
@@ -95,7 +114,7 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
         if(contact.name.isEmpty())
         {
             QList<QContact> contacts = m_contactManager.contacts(
-                        QContactPhoneNumber::match(number));
+                        (eventType == Event::IMEvent) ? IMAccountFilter(number):QContactPhoneNumber::match(number));
             if (contacts.isEmpty())
             {
                 contact.name = number;
@@ -113,7 +132,6 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
             }
             contactPool.insert(number,contact);
         }
-        int eventType = syncModel.data(syncModel.index(i,EventModel::EventType),0).toInt();
         switch(eventType)
         {
         case Event::SMSEvent:
@@ -144,8 +162,14 @@ Q_DECL_EXPORT int main(int argc, char *argv[])
                         syncModel.data(syncModel.index(i,EventModel::StartTime),0).toDateTime()
                         .toLocalTime().toString("ddd, d MMM yyyy H:m:s ").append(timeZone).toUtf8().data());
 
-        imap_add_identify(message,"Message-ID",
-                          syncModel.data(syncModel.index(i,EventModel::MessageToken),0).toString().append("@n9-sms-backup.local").toUtf8().data());
+        if (eventType == Event::SMSEvent)
+            imap_add_identify(message,"Message-ID",
+                              syncModel.data(syncModel.index(i,EventModel::MessageToken),0).toString().append("@n9-sms-backup.local").toUtf8().data());
+        else
+            imap_add_identify(message,"Message-ID",
+                              createMessageId(
+                                  syncModel.data(syncModel.index(i,EventModel::StartTime),0).toDateTime(),
+                                  number,eventType).append("@n9-sms-backup.local").toUtf8().data());
 
         imap_add_identify(message,"References",QString(refrence_format).
                           arg(prefrence).arg(syncModel.data(syncModel.index(i,EventModel::GroupId),0).toInt()).toUtf8().data());
